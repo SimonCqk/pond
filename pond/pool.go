@@ -1,6 +1,9 @@
 package pond
 
 import (
+	"runtime"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -14,7 +17,7 @@ type Pool interface {
 	SubmitWithTimeout(task Task, timeout time.Duration) (Future, error)
 
 	// Resize dynamically reset the capacity of pool.
-	Resize(newSize int)
+	Resize(newSize int32)
 
 	// Pause will block the whole pool, util Resume is invoked.
 	// Pool should wait for all under running tasks to be done, and
@@ -31,21 +34,53 @@ type Pool interface {
 }
 
 type basicPool struct {
-	capacity int
-	workers  []*Worker
-	taskQ    chan<- *taskWrapper
+	capacity int32
+	workers  []Worker
+	taskQ    chan *taskWrapper
 	pause    chan struct{}
 	close    chan struct{}
+	lock     sync.RWMutex
+	once     sync.Once
+}
+
+func newBasicPool(cap ...int32) Pool {
+	workersNum := defaultWorkersNumFactor * runtime.NumCPU()
+	bp := &basicPool{
+		capacity: append(cap, int32(defaultPoolCapacity*runtime.NumCPU()))[0],
+		taskQ:    make(chan *taskWrapper),
+		pause:    make(chan struct{}, 1),
+		close:    make(chan struct{}),
+	}
+	for i := 0; i < workersNum; i++ {
+		bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
+	}
+	go bp.purgeWorkers()
+	return bp
+}
+
+// purgeWorkers purge idle workers periodically and recycle resource.
+func (bp *basicPool) purgeWorkers() {
+	ticker := time.NewTicker(defaultPurgeWorkersDuration)
+	for {
+		select {
+		case <-ticker.C:
+			// TODO
+		}
+	}
 }
 
 func (bp *basicPool) Submit(task Task) (Future, error) {
 	rc := make(chan taskResult)
 
-	// check paused or closed
+	// check closed
 	select {
 	case <-bp.close:
 		return nil, ErrPoolClosed
-	case <-bp.pause:
+	default:
+	}
+
+	// check paused
+	if len(bp.pause) > 0 {
 		return nil, ErrPoolPaused
 	}
 
@@ -60,11 +95,15 @@ func (bp *basicPool) Submit(task Task) (Future, error) {
 func (bp *basicPool) SubmitWithTimeout(task Task, timeout time.Duration) (Future, error) {
 	rc := make(chan taskResult)
 
-	// check paused or closed
+	// check closed
 	select {
 	case <-bp.close:
 		return nil, ErrPoolClosed
-	case <-bp.pause:
+	default:
+	}
+
+	// check paused
+	if len(bp.pause) > 0 {
 		return nil, ErrPoolPaused
 	}
 
@@ -75,4 +114,32 @@ func (bp *basicPool) SubmitWithTimeout(task Task, timeout time.Duration) (Future
 	}
 
 	return newPondFuture(rc), nil
+}
+
+func (bp *basicPool) Resize(newSize int32) {
+	atomic.StoreInt32(&bp.capacity, newSize)
+
+}
+
+func (bp *basicPool) Pause() {
+	bp.pause <- struct{}{}
+}
+
+func (bp *basicPool) Resume() {
+	<-bp.pause
+}
+
+func (bp *basicPool) Close() {
+	bp.once.Do(func() {
+		close(bp.close)
+		close(bp.pause)
+
+		// clear workers
+		for _, worker := range bp.workers {
+			worker.Close()
+		}
+		bp.workers = nil
+
+		close(bp.taskQ)
+	})
 }
