@@ -1,5 +1,20 @@
 package pond
 
+// Task represent a task to be executed. No args passed in because it
+// can be easily achieved by closure, and return a Future instance to
+// get return value.
+type Task func() (interface{}, error)
+
+type taskResult struct {
+	val interface{}
+	err error
+}
+
+type taskWrapper struct {
+	t       Task
+	resChan chan taskResult
+}
+
 // Future associate with a Task instance and can be used to capture
 // return value of task.
 type Future interface {
@@ -11,11 +26,11 @@ type Future interface {
 	// function calls flow like stream.
 	Then(next func(interface{}) (interface{}, error)) Future
 
-	// OnSuccess provide the callback when future executed successfully.
+	// OnSuccess register the callback when future executed successfully.
 	// If task done with error, it is a no-op.
 	OnSuccess(f func(interface{}))
 
-	// OnFailure provide the callback when future done with some error.
+	// OnFailure register the callback when future done with some error.
 	// If task done with success, it is a no-op.
 	OnFailure(f func(error))
 }
@@ -24,32 +39,31 @@ type Future interface {
 type pondFuture struct {
 	value interface{}
 	err   error
-	done  chan struct{}
+	done  <-chan taskResult
 }
 
-func newPondFuture(next func() (interface{}, error)) *pondFuture {
-	f := pondFuture{done: make(chan struct{})}
-	go func() {
-		f.value, f.err = next()
-		f.done <- struct{}{}
-	}()
-	return &f
+func newPondFuture(doneC <-chan taskResult) *pondFuture {
+	return &pondFuture{done: doneC}
 }
 
 func (pf *pondFuture) Value() (interface{}, error) {
 	// block for done
-	<-pf.done
+	pf.value, pf.err = <-pf.done
 	return pf.value, pf.err
 }
 
 func (pf *pondFuture) Then(next func(interface{}) (interface{}, error)) Future {
-	return newPondFuture(func() (interface{}, error) {
+	doneC := make(chan taskResult)
+	f := newPondFuture(doneC)
+	go func() {
 		val, err := pf.Value()
 		if err != nil {
-			return val, err
+			return
 		}
-		return next(val)
-	})
+		val, err = next(val)
+		doneC <- taskResult{val: val, err: err}
+	}()
+	return f
 }
 
 func (pf *pondFuture) OnSuccess(f func(interface{})) {
