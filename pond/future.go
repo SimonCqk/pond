@@ -20,6 +20,7 @@ type Future interface {
 	OnFailure(f func(error))
 }
 
+// pond implementation of Future interface.
 type pondFuture struct {
 	value interface{}
 	err   error
@@ -52,15 +53,19 @@ func (pf *pondFuture) Then(next func(interface{}) (interface{}, error)) Future {
 }
 
 func (pf *pondFuture) OnSuccess(f func(interface{})) {
-	val, err := pf.Value()
-	if err == nil {
-		f(val)
-	}
+	go func() {
+		val, err := pf.Value()
+		if err == nil {
+			f(val)
+		}
+	}()
 }
 
 func (pf *pondFuture) OnFailure(f func(err error)) {
-	_, err := pf.Value()
-	if err != nil {
-		f(err)
-	}
+	go func() {
+		_, err := pf.Value()
+		if err != nil {
+			f(err)
+		}
+	}()
 }
