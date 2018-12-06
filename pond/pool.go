@@ -81,7 +81,12 @@ func (bp *basicPool) purgeWorkers() {
 					beg++
 				}
 			}
-			bp.workers = bp.workers[:end+1]
+			// handle edge case
+			if bp.workers[end].Idle() {
+				bp.workers = bp.workers[:end]
+			} else {
+				bp.workers = bp.workers[:end+1]
+			}
 			bp.lock.Unlock()
 		default:
 			bp.makePause()
