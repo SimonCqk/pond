@@ -42,7 +42,7 @@ type pondFuture struct {
 	done  <-chan taskResult
 }
 
-func newPondFuture(doneC <-chan taskResult) *pondFuture {
+func newPondFuture(doneC chan taskResult) *pondFuture {
 	return &pondFuture{done: doneC}
 }
 

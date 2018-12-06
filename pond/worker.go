@@ -1,5 +1,7 @@
 package pond
 
+import "time"
+
 // Worker represents a executor broker for goroutine, do the real job
 // and obtained by Pool.
 type Worker interface {
@@ -7,8 +9,9 @@ type Worker interface {
 	// invoked instantly when worker created.
 	run()
 
-	// Running return whether worker is under working.
-	Running() bool
+	// Idle return whether worker is in long-idle state which indicate
+	// can be recycled.
+	Idle() bool
 
 	// Cancel cancel next to-be-executed task immediately. If no pending
 	// task now, it is a no-op.
@@ -33,13 +36,15 @@ func newPondWorker(tq chan *taskWrapper) Worker {
 		taskQ:  tq,
 		cancel: make(chan struct{}),
 		close:  make(chan struct{}),
-		idle:   true,
+		idle:   false,
 	}
 	pw.run()
 	return pw
 }
 
 func (pw *pondWorker) run() {
+	timer := time.NewTimer(defaultIdleDuration)
+
 	for {
 		select {
 		case <-pw.close:
@@ -53,13 +58,16 @@ func (pw *pondWorker) run() {
 			pw.idle = false
 			val, err := task.t()
 			task.resChan <- taskResult{val: val, err: err}
+			timer.Reset(defaultIdleDuration)
+		case <-timer.C:
 			pw.idle = true
+			timer.Reset(defaultIdleDuration)
 		}
 	}
 }
 
-func (pw *pondWorker) Running() bool {
-	return !pw.idle
+func (pw *pondWorker) Idle() bool {
+	return pw.idle
 }
 
 func (pw *pondWorker) Cancel() {

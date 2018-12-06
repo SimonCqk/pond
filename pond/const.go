@@ -11,15 +11,23 @@ var (
 	ErrTaskTimeout = errors.New("task: task timeout")
 )
 
+// constraints for pool
 const (
 	// purge idle workers to recycle resource every 30s.
-	defaultPurgeWorkersDuration = 30 * time.Second
-	// make task queue a buffered channel, so as to avoid accidently blocking main
-	// goroutine, BUT IT MAY HAPPEN SOME TIME.
-	defaultTaskBufferSize = 16
+	defaultPurgeWorkersDuration = 32 * time.Second
 	// default number of goroutines launched when pool initialized is
 	// defaultWorkersNumFactor * NumCPU
 	defaultWorkersNumFactor = 2
-	// default pool capacity is defaultPoolCapacity * NumCPU
-	defaultPoolCapacity = 8
+	// make task queue a buffered channel, so as to avoid accidently blocking main
+	// goroutine when submit, BUT BLOCK MAY HAPPEN SOME TIME.
+	defaultTaskBufferSizeFactor = 4
+	// default pool capacity is defaultPoolCapacityFactor * NumCPU
+	defaultPoolCapacityFactor = 8
+)
+
+// constraints for workers
+const (
+	// if a worker doesn't preempt a task after defaultIdleDuration,
+	// it will be flagged as idle.
+	defaultIdleDuration = 8 * time.Second
 )
