@@ -38,7 +38,7 @@ func newPondWorker(tq chan *taskWrapper) Worker {
 		close:  make(chan struct{}),
 		idle:   false,
 	}
-	pw.run()
+	go pw.run()
 	return pw
 }
 
