@@ -44,7 +44,6 @@ type basicPool struct {
 }
 
 func newBasicPool(cap ...int) Pool {
-	workersNum := defaultWorkersNumFactor * runtime.NumCPU()
 	bp := &basicPool{
 		capacity:      append(cap, defaultPoolCapacityFactor*runtime.NumCPU())[0],
 		taskQ:         make(chan *taskWrapper, defaultTaskBufferSizeFactor*runtime.NumCPU()),
@@ -53,7 +52,7 @@ func newBasicPool(cap ...int) Pool {
 		purgeDuration: defaultPurgeWorkersDuration,
 		purgeTicker:   time.NewTicker(defaultPurgeWorkersDuration),
 	}
-	for i := 0; i < workersNum; i++ {
+	for i := 0; i < bp.capacity; i++ {
 		bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
 	}
 	go bp.purgeWorkers()
@@ -111,6 +110,8 @@ func (bp *basicPool) Submit(task Task) (Future, error) {
 
 	bp.taskQ <- &taskWrapper{t: task, resChan: rc}
 
+	bp.autoExpand()
+
 	return newPondFuture(rc), nil
 }
 
@@ -134,6 +135,8 @@ func (bp *basicPool) SubmitWithTimeout(task Task, timeout time.Duration) (Future
 		return nil, ErrTaskTimeout
 	case bp.taskQ <- &taskWrapper{t: task, resChan: rc}:
 	}
+
+	bp.autoExpand()
 
 	return newPondFuture(rc), nil
 }
@@ -202,17 +205,33 @@ func (bp *basicPool) Close() {
 	bp.lock.Unlock()
 }
 
+// Capacity return current capacity of pool.
 func (bp *basicPool) Capacity() int {
 	bp.lock.RLock()
 	defer bp.lock.RUnlock()
 	return bp.capacity
 }
 
+// Workers return current number of under working workers.
+func (bp *basicPool) Workers() int {
+	bp.lock.RLock()
+	defer bp.lock.RUnlock()
+	return len(bp.workers)
+}
+
+// SetPurgeDuration set duration of pool recycling its idle workers.
 func (bp *basicPool) SetPurgeDuration(dur time.Duration) {
 	if dur != bp.purgeDuration {
 		bp.lock.Lock()
 		bp.purgeDuration = dur
 		bp.purgeTicker = time.NewTicker(dur)
 		bp.lock.Unlock()
+	}
+}
+
+// autoExpand expand number of workers when too many tasks accumulated.
+func (bp *basicPool) autoExpand() {
+	if float32(len(bp.taskQ))/float32(cap(bp.taskQ)) >= autoExpandFactor {
+		bp.SetCapacity(bp.capacity + bp.capacity/2)
 	}
 }
