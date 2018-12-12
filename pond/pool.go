@@ -18,6 +18,8 @@ type Pool interface {
 	// SetCapacity dynamically reset the capacity of pool.
 	SetCapacity(newCap int)
 
+	//
+
 	// Pause will block the whole pool, util Resume is invoked.
 	// Pool should wait for all under running tasks to be done, and
 	// clear all idle workers.
@@ -43,7 +45,7 @@ type basicPool struct {
 	purgeTicker   *time.Ticker
 }
 
-func newBasicPool(cap ...int) Pool {
+func newBasicPool(cap ...int) *basicPool {
 	bp := &basicPool{
 		capacity:      append(cap, defaultPoolCapacityFactor*runtime.NumCPU())[0],
 		taskQ:         make(chan *taskWrapper, defaultTaskBufferSizeFactor*runtime.NumCPU()),
