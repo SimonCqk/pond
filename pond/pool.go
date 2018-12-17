@@ -18,8 +18,6 @@ type Pool interface {
 	// SetCapacity dynamically reset the capacity of pool.
 	SetCapacity(newCap int)
 
-	//
-
 	// Pause will block the whole pool, util Resume is invoked.
 	// Pool should wait for all under running tasks to be done, and
 	// clear all idle workers.

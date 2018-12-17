@@ -1,5 +1,9 @@
 package pond
 
+import (
+	"sync/atomic"
+)
+
 // Task represent a task to be executed. No args passed in because it
 // can be easily achieved by closure, and return a Future instance to
 // get return value.
@@ -39,7 +43,8 @@ type Future interface {
 type pondFuture struct {
 	value interface{}
 	err   error
-	done  <-chan taskResult
+	done  chan taskResult
+	ready int32
 }
 
 func newPondFuture(doneC chan taskResult) *pondFuture {
@@ -47,8 +52,23 @@ func newPondFuture(doneC chan taskResult) *pondFuture {
 }
 
 func (pf *pondFuture) Value() (interface{}, error) {
+	if atomic.LoadInt32(&pf.ready) != 0 {
+		return pf.value, pf.err
+	}
 	// block for done
-	pf.value, pf.err = <-pf.done
+	tr := <-pf.done
+
+	// double checks. It may have multiply goroutines hanging for
+	// done, when pf.done closed, all these goroutines will be free
+	// and ready for get result.
+	if atomic.LoadInt32(&pf.ready) != 0 {
+		return pf.value, pf.err
+	}
+
+	pf.value, pf.err = tr.val, tr.err
+	atomic.StoreInt32(&pf.ready, 1)
+	close(pf.done)
+
 	return pf.value, pf.err
 }
 
@@ -58,6 +78,7 @@ func (pf *pondFuture) Then(next func(interface{}) (interface{}, error)) Future {
 	go func() {
 		val, err := pf.Value()
 		if err != nil {
+			doneC <- taskResult{err: err}
 			return
 		}
 		val, err = next(val)
