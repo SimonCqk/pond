@@ -1,6 +1,8 @@
 package pond
 
-import "time"
+import (
+	"time"
+)
 
 // Worker represents a executor broker for goroutine, do the real job
 // and obtained by Pool.
@@ -33,9 +35,10 @@ type pondWorker struct {
 
 func newPondWorker(tq chan *taskWrapper) Worker {
 	pw := &pondWorker{
-		taskQ:  tq,
-		cancel: make(chan struct{}),
-		close:  make(chan struct{}),
+		taskQ: tq,
+		// when other goroutine call Cancel or Close, it will not block
+		cancel: make(chan struct{}, 1),
+		close:  make(chan struct{}, 1),
 		idle:   false,
 	}
 	go pw.run()
