@@ -94,7 +94,9 @@ func (bp *basicPool) purgeWorkers() {
 }
 
 func (bp *basicPool) Submit(task Task) (Future, error) {
-	rc := make(chan taskResult)
+	// not all callers hold the returned Future, so that there may no
+	// receiver side which may cause block when worker send return values.
+	rc := make(chan taskResult, 1)
 
 	// check closed
 	select {
@@ -116,7 +118,9 @@ func (bp *basicPool) Submit(task Task) (Future, error) {
 }
 
 func (bp *basicPool) SubmitWithTimeout(task Task, timeout time.Duration) (Future, error) {
-	rc := make(chan taskResult)
+	// not all callers hold the returned Future, so that there may no
+	// receiver side which may cause block when worker send return values.
+	rc := make(chan taskResult, 1)
 
 	// check closed
 	select {

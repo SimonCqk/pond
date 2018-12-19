@@ -56,16 +56,16 @@ func (pf *pondFuture) Value() (interface{}, error) {
 		return pf.value, pf.err
 	}
 	// block for done
-	tr := <-pf.done
+	taskRes := <-pf.done
 
-	// double checks. It may have multiply goroutines hanging for
-	// done, when pf.done closed, all these goroutines will be free
-	// and ready for get result.
+	// double checks. It may have multiply goroutines hanging and waiting
+	// for done, when pf.done closed, all these goroutines will be free
+	// and ready to get result.
 	if atomic.LoadInt32(&pf.ready) != 0 {
 		return pf.value, pf.err
 	}
 
-	pf.value, pf.err = tr.val, tr.err
+	pf.value, pf.err = taskRes.val, taskRes.err
 	atomic.StoreInt32(&pf.ready, 1)
 	close(pf.done)
 
