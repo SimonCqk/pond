@@ -15,10 +15,6 @@ type Worker interface {
 	// can be recycled.
 	Idle() bool
 
-	// Cancel cancel next to-be-executed task immediately. If no pending
-	// task now, it is a no-op.
-	Cancel()
-
 	// Close close the worker and recycle resource, if it is
 	// under working, waiting for task done synchronously.
 	Close()
@@ -36,9 +32,9 @@ type pondWorker struct {
 func newPondWorker(tq chan *taskWrapper) Worker {
 	pw := &pondWorker{
 		taskQ: tq,
-		// when other goroutine call Cancel or Close, it will not block
+		// when other goroutine call Cancel, it will not block
 		cancel: make(chan struct{}, 1),
-		close:  make(chan struct{}, 1),
+		close:  make(chan struct{}),
 		idle:   false,
 	}
 	go pw.run()
@@ -54,8 +50,7 @@ func (pw *pondWorker) run() {
 			return
 		case <-pw.cancel:
 			// if cancel signal arrive earlier than task, then deprecate the
-			// coming task, else if no pending task now, do nothing cause we
-			// will be failed to read taskQ.
+			// coming task, else if no pending task now, it's a no-op.
 			_, _ = <-pw.taskQ
 		case task := <-pw.taskQ:
 			pw.idle = false
@@ -71,10 +66,6 @@ func (pw *pondWorker) run() {
 
 func (pw *pondWorker) Idle() bool {
 	return pw.idle
-}
-
-func (pw *pondWorker) Cancel() {
-	pw.cancel <- struct{}{}
 }
 
 func (pw *pondWorker) Close() {
