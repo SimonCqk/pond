@@ -23,19 +23,16 @@ type Worker interface {
 type pondWorker struct {
 	// taskQ is a replication of Pool.taskQ, workers preempt for tasks
 	// over Pool.taskQ, if no more task comes, worker will be asleep.
-	taskQ  chan *taskWrapper
-	cancel chan struct{}
-	close  chan struct{}
-	idle   bool
+	taskQ chan *taskWrapper
+	close chan struct{}
+	idle  bool
 }
 
 func newPondWorker(tq chan *taskWrapper) Worker {
 	pw := &pondWorker{
 		taskQ: tq,
-		// when other goroutine call Cancel, it will not block
-		cancel: make(chan struct{}, 1),
-		close:  make(chan struct{}),
-		idle:   false,
+		close: make(chan struct{}, 1),
+		idle:  false,
 	}
 	go pw.run()
 	return pw
@@ -48,10 +45,6 @@ func (pw *pondWorker) run() {
 		select {
 		case <-pw.close:
 			return
-		case <-pw.cancel:
-			// if cancel signal arrive earlier than task, then deprecate the
-			// coming task, else if no pending task now, it's a no-op.
-			_, _ = <-pw.taskQ
 		case task := <-pw.taskQ:
 			pw.idle = false
 			val, err := task.t()

@@ -88,7 +88,7 @@ func (bp *basicPool) purgeWorkers() {
 			}
 			bp.lock.Unlock()
 		default:
-			bp.makePause()
+			bp.tryPause()
 		}
 	}
 }
@@ -174,9 +174,9 @@ func (bp *basicPool) Pause() {
 	bp.pause <- struct{}{}
 }
 
-// makePause judge if pool is in paused state, if so, stop
+// tryPause judge if pool is in paused state, if so, stop
 // current action and wait for resume.
-func (bp *basicPool) makePause() {
+func (bp *basicPool) tryPause() {
 	if len(bp.pause) > 0 {
 		// try send signal and it will block because buffer size
 		// of pause channel is 1
