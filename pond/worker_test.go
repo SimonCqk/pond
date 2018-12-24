@@ -9,7 +9,7 @@ import (
 func TestPondWorkerIdle(t *testing.T) {
 	taskQueue := make(chan *taskWrapper)
 	worker := newPondWorker(taskQueue)
-	resChan := make(chan taskResult, 1)
+	resChan := make(chan *taskResult, 1)
 	sig := make(chan struct{})
 
 	go func() {

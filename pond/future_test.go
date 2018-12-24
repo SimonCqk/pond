@@ -12,12 +12,12 @@ func TestFutureValue(t *testing.T) {
 		s := "value"
 		return s, nil
 	}
-	c := make(chan taskResult, 1)
+	c := make(chan *taskResult, 1)
 	future := newPondFuture(c)
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 		val, err := f()
-		c <- taskResult{val: val, err: err}
+		c <- &taskResult{val: val, err: err}
 	}()
 
 	val, err := future.Value()
@@ -29,7 +29,7 @@ func TestFutureOnSuccess(t *testing.T) {
 		s := "future"
 		return s, nil
 	}
-	c := make(chan taskResult, 1)
+	c := make(chan *taskResult, 1)
 	future := newPondFuture(c)
 
 	future.OnSuccess(func(i interface{}) {
@@ -39,7 +39,7 @@ func TestFutureOnSuccess(t *testing.T) {
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 		val, err := f()
-		c <- taskResult{val: val, err: err}
+		c <- &taskResult{val: val, err: err}
 	}()
 
 	val, err := future.Value()
@@ -52,7 +52,7 @@ func TestFutureOnFailure(t *testing.T) {
 		s := "future"
 		return s, errors.New("failure")
 	}
-	c := make(chan taskResult, 1)
+	c := make(chan *taskResult, 1)
 	future := newPondFuture(c)
 
 	future.OnFailure(func(err error) {
@@ -62,7 +62,7 @@ func TestFutureOnFailure(t *testing.T) {
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 		val, err := f()
-		c <- taskResult{val: val, err: err}
+		c <- &taskResult{val: val, err: err}
 	}()
 
 	val, err := future.Value()
@@ -75,7 +75,7 @@ func TestFutureThen(t *testing.T) {
 		s := "future"
 		return s, nil
 	}
-	c := make(chan taskResult, 1)
+	c := make(chan *taskResult, 1)
 	future := newPondFuture(c)
 
 	f1 := future.Then(func(i interface{}) (interface{}, error) {
@@ -93,7 +93,7 @@ func TestFutureThen(t *testing.T) {
 
 	go func() {
 		val, err := f()
-		c <- taskResult{val: val, err: err}
+		c <- &taskResult{val: val, err: err}
 	}()
 
 	val, err := f3.Value()

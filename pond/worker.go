@@ -47,8 +47,11 @@ func (pw *pondWorker) run() {
 			return
 		case task := <-pw.taskQ:
 			pw.idle = false
-			val, err := task.t()
-			task.resChan <- taskResult{val: val, err: err}
+
+			taskRes := resultPool.Get().(*taskResult)
+			taskRes.val, taskRes.err = task.t()
+			task.resChan <- taskRes
+
 			timer.Reset(defaultIdleDuration)
 		case <-timer.C:
 			pw.idle = true

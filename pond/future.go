@@ -16,7 +16,7 @@ type taskResult struct {
 
 type taskWrapper struct {
 	t       Task
-	resChan chan taskResult
+	resChan chan *taskResult
 }
 
 // Future associate with a Task instance and can be used to capture
@@ -43,11 +43,11 @@ type Future interface {
 type pondFuture struct {
 	value interface{}
 	err   error
-	done  chan taskResult
+	done  chan *taskResult
 	ready int32
 }
 
-func newPondFuture(doneC chan taskResult) *pondFuture {
+func newPondFuture(doneC chan *taskResult) *pondFuture {
 	return &pondFuture{done: doneC}
 }
 
@@ -66,6 +66,8 @@ func (pf *pondFuture) Value() (interface{}, error) {
 	}
 
 	pf.value, pf.err = taskRes.val, taskRes.err
+	resultPool.Put(taskRes)
+
 	atomic.StoreInt32(&pf.ready, 1)
 	close(pf.done)
 
@@ -73,16 +75,19 @@ func (pf *pondFuture) Value() (interface{}, error) {
 }
 
 func (pf *pondFuture) Then(next func(interface{}) (interface{}, error)) Future {
-	doneC := make(chan taskResult)
+	doneC := make(chan *taskResult)
 	f := newPondFuture(doneC)
 	go func() {
 		val, err := pf.Value()
 		if err != nil {
-			doneC <- taskResult{err: err}
+			tr := resultPool.Get().(*taskResult)
+			tr.err = err
+			doneC <- tr
 			return
 		}
-		val, err = next(val)
-		doneC <- taskResult{val: val, err: err}
+		tr := resultPool.Get().(*taskResult)
+		tr.val, tr.err = next(val)
+		doneC <- tr
 	}()
 	return f
 }
