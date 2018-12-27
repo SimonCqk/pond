@@ -51,3 +51,20 @@ func TestBasicPoolClose(t *testing.T) {
 		t.Error("pool has closed, no more task submitted and should return ErrPoolClosed")
 	}
 }
+
+func TestBasicPoolSetCapacity(t *testing.T) {
+	pool := NewPool()
+	pool.SetCapacity(1)
+	if pool.Workers() != 1 {
+		t.Error("new number of workers should be 1")
+	}
+	pool.SetCapacity(10)
+	if pool.Workers() != 10 {
+		t.Error("new number of workers should be 10")
+	}
+	pool.SetCapacity(5)
+	if pool.Workers() != 5 {
+		t.Error("new number of workers should be 5")
+	}
+	pool.Close()
+}
