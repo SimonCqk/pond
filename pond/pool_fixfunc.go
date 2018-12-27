@@ -33,7 +33,7 @@ func NewFixedFuncPool(f FixedFunc, cap ...int) *FixedFuncPool {
 	go bp.purgeWorkers()
 	return &FixedFuncPool{
 		pool:  bp,
-		empty: make(chan struct{}, 1),
+		empty: make(chan struct{}),
 		f:     f,
 	}
 }
