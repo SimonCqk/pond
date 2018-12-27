@@ -46,6 +46,11 @@ func (pw *pondWorker) run() {
 		case <-pw.close:
 			return
 		case task := <-pw.taskQ:
+			if task == nil {
+				// task has done in other goroutines.
+				continue
+			}
+
 			pw.idle = false
 
 			taskRes := resultPool.Get().(*taskResult)
