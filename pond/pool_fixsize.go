@@ -21,8 +21,7 @@ func NewFixedSizePool(cap, maxTasks int) *FixedSizePool {
 		bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
 	}
 	go bp.purgeWorkers()
-	pool := &FixedSizePool{bp}
-	return pool
+	return &FixedSizePool{bp}
 }
 
 // SetCapacity do nothing, for overriding the SetCapacity impl of

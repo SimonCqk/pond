@@ -54,9 +54,10 @@ type basicPool struct {
 }
 
 func newBasicPool(cap ...int) *basicPool {
+	cores := runtime.NumCPU()
 	bp := &basicPool{
-		capacity:      append(cap, defaultPoolCapacityFactor*runtime.NumCPU())[0],
-		taskQ:         make(chan *taskWrapper, defaultTaskBufferSizeFactor*runtime.NumCPU()),
+		capacity:      append(cap, defaultPoolCapacityFactor*cores)[0],
+		taskQ:         make(chan *taskWrapper, defaultTaskBufferSizeFactor*cores),
 		pause:         make(chan struct{}, 1), // make pause buffered
 		close:         make(chan struct{}),
 		purgeDuration: defaultPurgeWorkersDuration,
@@ -122,7 +123,7 @@ func (bp *basicPool) Submit(task Task) (Future, error) {
 
 	bp.taskQ <- &taskWrapper{t: task, resChan: rc}
 
-	bp.autoExpand()
+	bp.scale()
 
 	return newPondFuture(rc), nil
 }
@@ -150,7 +151,7 @@ func (bp *basicPool) SubmitWithTimeout(task Task, timeout time.Duration) (Future
 	case bp.taskQ <- &taskWrapper{t: task, resChan: rc}:
 	}
 
-	bp.autoExpand()
+	bp.scale()
 
 	return newPondFuture(rc), nil
 }
@@ -243,9 +244,10 @@ func (bp *basicPool) SetPurgeDuration(dur time.Duration) {
 	}
 }
 
-// autoExpand expand number of workers when too many tasks accumulated.
-func (bp *basicPool) autoExpand() {
+// scale expand number of workers when too many tasks accumulated.
+func (bp *basicPool) scale() {
 	if float32(len(bp.taskQ))/float32(cap(bp.taskQ)) >= autoExpandFactor {
 		bp.SetCapacity(bp.capacity + bp.capacity/2)
 	}
+	// shrink achieved by purgeWorkers().
 }
