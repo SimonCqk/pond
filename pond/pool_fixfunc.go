@@ -15,7 +15,7 @@ type FixedFuncPool struct {
 	f     FixedFunc
 }
 
-type FixedFunc func(...interface{}) (interface{}, error)
+type FixedFunc func(interface{}) (interface{}, error)
 
 func NewFixedFuncPool(f FixedFunc, cap ...int) *FixedFuncPool {
 	cores := runtime.NumCPU()
@@ -38,7 +38,7 @@ func NewFixedFuncPool(f FixedFunc, cap ...int) *FixedFuncPool {
 	}
 }
 
-func (p *FixedFuncPool) Submit(args ...interface{}) (Future, error) {
+func (p *FixedFuncPool) Submit(arg interface{}) (Future, error) {
 	// not all callers hold the returned Future, so that there may no
 	// receiver side which may cause block when worker send return values.
 	rc := make(chan *taskResult, 1)
@@ -56,7 +56,7 @@ func (p *FixedFuncPool) Submit(args ...interface{}) (Future, error) {
 	}
 
 	p.pool.taskQ <- &taskWrapper{
-		t:       func() (interface{}, error) { return p.f(args...) },
+		t:       func() (interface{}, error) { return p.f(arg) },
 		resChan: rc,
 	}
 
@@ -65,7 +65,7 @@ func (p *FixedFuncPool) Submit(args ...interface{}) (Future, error) {
 	return newPondFuture(rc), nil
 }
 
-func (p *FixedFuncPool) SubmitWithTimeout(timeout time.Duration, args ...interface{}) (Future, error) {
+func (p *FixedFuncPool) SubmitWithTimeout(arg interface{}, timeout time.Duration) (Future, error) {
 	// not all callers hold the returned Future, so that there may no
 	// receiver side which may cause block when worker send return values.
 	rc := make(chan *taskResult, 1)
@@ -83,7 +83,7 @@ func (p *FixedFuncPool) SubmitWithTimeout(timeout time.Duration, args ...interfa
 	}
 
 	task := &taskWrapper{
-		t:       func() (interface{}, error) { return p.f(args...) },
+		t:       func() (interface{}, error) { return p.f(arg) },
 		resChan: rc,
 	}
 
