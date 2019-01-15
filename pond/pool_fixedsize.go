@@ -11,7 +11,7 @@ type FixedSizePool struct {
 func NewFixedSizePool(cap, maxTasks int) *FixedSizePool {
 	bp := &basicPool{
 		capacity:      cap,
-		taskQ:         make(chan *taskWrapper, maxTasks),
+		taskQ:         make(chan chan *taskWrapper, maxTasks),
 		pause:         make(chan struct{}, 1), // make pause buffered
 		close:         make(chan struct{}),
 		purgeDuration: defaultPurgeWorkersDuration,

@@ -1,6 +1,8 @@
 package pond
 
-import "testing"
+import (
+	"testing"
+)
 
 func fooPow(num interface{}) (i interface{}, err error) {
 	n := num.(int)

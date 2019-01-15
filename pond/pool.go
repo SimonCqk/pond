@@ -1,6 +1,7 @@
 package pond
 
 import (
+	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -45,7 +46,7 @@ type Pool interface {
 type basicPool struct {
 	capacity      int
 	workers       []Worker
-	taskQ         chan *taskWrapper
+	taskQ         chan chan *taskWrapper
 	pause         chan struct{}
 	close         chan struct{}
 	lock          sync.RWMutex
@@ -57,12 +58,14 @@ func newBasicPool(cap ...int) *basicPool {
 	cores := runtime.NumCPU()
 	bp := &basicPool{
 		capacity:      append(cap, defaultPoolCapacityFactor*cores)[0],
-		taskQ:         make(chan *taskWrapper, defaultTaskBufferSizeFactor*cores),
 		pause:         make(chan struct{}, 1), // make pause buffered
 		close:         make(chan struct{}),
 		purgeDuration: defaultPurgeWorkersDuration,
 		purgeTicker:   time.NewTicker(defaultPurgeWorkersDuration),
 	}
+
+	bp.taskQ = make(chan chan *taskWrapper, bp.capacity)
+
 	for i := 0; i < bp.capacity; i++ {
 		bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
 	}
@@ -121,7 +124,8 @@ func (bp *basicPool) Submit(task Task) (Future, error) {
 		return nil, ErrPoolPaused
 	}
 
-	bp.taskQ <- &taskWrapper{t: task, resChan: rc}
+	taskC := <-bp.taskQ
+	taskC <- &taskWrapper{t: task, resChan: rc}
 
 	bp.scale()
 
@@ -148,7 +152,8 @@ func (bp *basicPool) SubmitWithTimeout(task Task, timeout time.Duration) (Future
 	select {
 	case <-time.After(timeout):
 		return nil, ErrTaskTimeout
-	case bp.taskQ <- &taskWrapper{t: task, resChan: rc}:
+	case taskC := <-bp.taskQ:
+		taskC <- &taskWrapper{t: task, resChan: rc}
 	}
 
 	bp.scale()
@@ -169,6 +174,7 @@ func (bp *basicPool) SetCapacity(newCap int) {
 		for i := curCap; i < newCap; i++ {
 			bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
 		}
+		fmt.Println("curCap > newCap done")
 		return
 	}
 
@@ -246,8 +252,10 @@ func (bp *basicPool) SetPurgeDuration(dur time.Duration) {
 
 // scale expand number of workers when too many tasks accumulated.
 func (bp *basicPool) scale() {
-	if float32(len(bp.taskQ))/float32(cap(bp.taskQ)) >= autoExpandFactor {
-		bp.SetCapacity(bp.capacity + bp.capacity/2)
-	}
+	/*
+		if float32(len(bp.taskQ))/float32(cap(bp.taskQ)) >= autoExpandFactor {
+			bp.SetCapacity(bp.capacity + bp.capacity/2)
+		}
+	*/
 	// shrink achieved by purgeWorkers().
 }

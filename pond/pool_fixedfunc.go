@@ -21,12 +21,14 @@ func NewFixedFuncPool(f FixedFunc, cap ...int) *FixedFuncPool {
 	cores := runtime.NumCPU()
 	bp := &basicPool{
 		capacity:      append(cap, defaultPoolCapacityFactor*cores)[0],
-		taskQ:         make(chan *taskWrapper, defaultTaskBufferSizeFactor*cores),
 		pause:         make(chan struct{}, 1), // make pause buffered
 		close:         make(chan struct{}),
 		purgeDuration: defaultPurgeWorkersDuration,
 		purgeTicker:   time.NewTicker(defaultPurgeWorkersDuration),
 	}
+
+	bp.taskQ = make(chan chan *taskWrapper, bp.capacity)
+
 	for i := 0; i < bp.capacity; i++ {
 		bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
 	}
@@ -55,7 +57,8 @@ func (p *FixedFuncPool) Submit(arg interface{}) (Future, error) {
 		return nil, ErrPoolPaused
 	}
 
-	p.pool.taskQ <- &taskWrapper{
+	taskC := <-p.pool.taskQ
+	taskC <- &taskWrapper{
 		t:       func() (interface{}, error) { return p.f(arg) },
 		resChan: rc,
 	}
@@ -90,7 +93,8 @@ func (p *FixedFuncPool) SubmitWithTimeout(arg interface{}, timeout time.Duration
 	select {
 	case <-time.After(timeout):
 		return nil, ErrTaskTimeout
-	case p.pool.taskQ <- task:
+	case taskC := <-p.pool.taskQ:
+		taskC <- task
 	}
 
 	p.pool.scale()
@@ -115,7 +119,9 @@ func (p *FixedFuncPool) SetNewFixedFunc(newFunc FixedFunc) {
 				return
 			default:
 				curLen := len(p.pool.taskQ)
-				if curLen == 0 {
+				// when curLen == capacity, all workers are in idle state and waiting for
+				// being dispatched.
+				if curLen == p.pool.capacity {
 					p.empty <- struct{}{}
 					return
 				}

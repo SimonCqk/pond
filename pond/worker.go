@@ -1,9 +1,5 @@
 package pond
 
-import (
-	"time"
-)
-
 // Worker represents a executor broker for goroutine, do the real job
 // and obtained by Pool.
 type Worker interface {
@@ -21,46 +17,51 @@ type Worker interface {
 }
 
 type pondWorker struct {
-	// taskQ is a replication of Pool.taskQ, workers preempt for tasks
-	// over Pool.taskQ, if no more task comes, worker will be asleep.
-	taskQ chan *taskWrapper
+	// taskQ is a replication of Pool.taskQ, pool will dispatch task to
+	// idle workers, otherwise worker will be asleep.
+	taskQ chan chan *taskWrapper
+	selfQ chan *taskWrapper
 	close chan struct{}
 	idle  bool
 }
 
-func newPondWorker(tq chan *taskWrapper) Worker {
+func newPondWorker(tq chan chan *taskWrapper) Worker {
 	pw := &pondWorker{
 		taskQ: tq,
+		selfQ: make(chan *taskWrapper),
 		close: make(chan struct{}, 1),
 		idle:  false,
 	}
+
+	tq <- pw.selfQ
+
 	go pw.run()
 	return pw
 }
 
 func (pw *pondWorker) run() {
-	timer := time.NewTimer(defaultIdleDuration)
 
 	for {
 		select {
 		case <-pw.close:
 			return
-		case task := <-pw.taskQ:
-			if task == nil {
-				// task has done in other goroutines.
-				continue
-			}
-
+		case task := <-pw.selfQ:
 			pw.idle = false
 
 			taskRes := resultPool.Get().(*taskResult)
 			taskRes.val, taskRes.err = task.t()
 			task.resChan <- taskRes
 
-			timer.Reset(defaultIdleDuration)
-		case <-timer.C:
+			// check closing
+			select {
+			case <-pw.close:
+				return
+			default:
+				// resend self queue into pool's task queue for dispatching.
+				pw.taskQ <- pw.selfQ
+			}
+
 			pw.idle = true
-			timer.Reset(defaultIdleDuration)
 		}
 	}
 }

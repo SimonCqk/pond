@@ -1,6 +1,7 @@
 package pond
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -55,16 +56,20 @@ func TestBasicPoolClose(t *testing.T) {
 func TestBasicPoolSetCapacity(t *testing.T) {
 	pool := NewPool()
 	pool.SetCapacity(1)
+	fmt.Println(1)
 	if pool.Workers() != 1 {
 		t.Error("new number of workers should be 1")
 	}
 	pool.SetCapacity(10)
+	fmt.Println(10)
 	if pool.Workers() != 10 {
 		t.Error("new number of workers should be 10")
 	}
 	pool.SetCapacity(5)
+	fmt.Println(5)
 	if pool.Workers() != 5 {
 		t.Error("new number of workers should be 5")
 	}
 	pool.Close()
+	fmt.Println(t.Name() + " Done")
 }
