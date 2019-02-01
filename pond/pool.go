@@ -194,7 +194,7 @@ func (bp *basicPool) Pause() {
 // tryPause judge if pool is in paused state, if so, stop
 // current action and wait for resume.
 func (bp *basicPool) tryPause() {
-	if len(bp.pause) > 0 {
+	if _, open := <-bp.close; open && len(bp.pause) > 0 {
 		// try send signal and it will block because buffer size
 		// of pause channel is 1
 		bp.pause <- struct{}{}

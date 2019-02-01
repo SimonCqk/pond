@@ -1,8 +1,8 @@
 package pond
 
 import (
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"testing"
 	"time"
 )

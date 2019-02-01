@@ -1,6 +1,6 @@
 package pond
 
-import "go-containers"
+import "github.com/Simoncqk/go-containers"
 
 type ResizableChan struct {
 	in, out  chan *taskWrapper
@@ -65,7 +65,7 @@ func (ch *ResizableChan) autoResize() {
 				input = nil
 			}
 		case output <- nextTask:
-			_, _ = ch.buffer.Pop()
+			_ = ch.buffer.Pop()
 		case ch.size = <-ch.resizeCh:
 		}
 
@@ -75,7 +75,7 @@ func (ch *ResizableChan) autoResize() {
 			nextTask = nil
 		} else {
 			output = ch.out
-			next, _ := ch.buffer.Peek()
+			next := ch.buffer.Peek()
 			nextTask = next.(*taskWrapper)
 		}
 		// ch is full
