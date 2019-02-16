@@ -21,5 +21,5 @@ const (
 
 	// pool auto expand its capacity when its len(tasksQueue) / cap(taskQueue) equals or
 	// greater than autoExpandFactor
-	autoExpandFactor = 0.8
+	autoExpandFactor = 0.75
 )

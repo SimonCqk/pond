@@ -11,10 +11,11 @@ type ResizableChan struct {
 
 func NewResizableChan(initSize int) *ResizableChan {
 	ch := &ResizableChan{
-		in:     make(chan *taskWrapper),
-		out:    make(chan *taskWrapper),
-		buffer: containers.NewQueue(),
-		size:   initSize,
+		in:       make(chan *taskWrapper),
+		out:      make(chan *taskWrapper),
+		resizeCh: make(chan int),
+		buffer:   containers.NewQueue(),
+		size:     initSize,
 	}
 	go ch.autoResize()
 	return ch
@@ -36,7 +37,6 @@ func (ch *ResizableChan) Resize(size int) {
 		panic("invalid size of ResizableChan")
 	}
 	ch.resizeCh <- size
-	ch.size = size
 }
 
 func (ch *ResizableChan) Len() int {
@@ -65,7 +65,7 @@ func (ch *ResizableChan) autoResize() {
 				input = nil
 			}
 		case output <- nextTask:
-			_ = ch.buffer.Pop()
+			ch.buffer.Pop()
 		case ch.size = <-ch.resizeCh:
 		}
 
@@ -75,8 +75,7 @@ func (ch *ResizableChan) autoResize() {
 			nextTask = nil
 		} else {
 			output = ch.out
-			next := ch.buffer.Peek()
-			nextTask = next.(*taskWrapper)
+			nextTask = ch.buffer.Peek().(*taskWrapper)
 		}
 		// ch is full
 		if ch.buffer.Size() >= ch.size {

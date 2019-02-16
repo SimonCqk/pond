@@ -32,9 +32,7 @@ func newPondWorker(tq chan chan *taskWrapper) Worker {
 		close: make(chan struct{}, 1),
 		idle:  false,
 	}
-
 	tq <- pw.selfQ
-
 	go pw.run()
 	return pw
 }
