@@ -119,7 +119,7 @@ func (p *FixedFuncPool) SetNewFixedFunc(newFunc FixedFunc) {
 				return
 			default:
 				curLen := p.pool.taskQ.Len()
-				if curLen == p.pool.capacity {
+				if curLen == 0 {
 					empty <- struct{}{}
 					return
 				}

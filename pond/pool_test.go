@@ -13,6 +13,7 @@ func foo() (interface{}, error) {
 
 func TestBasicPoolSubmit(t *testing.T) {
 	fmt.Println(t.Name())
+	fmt.Println(t.Name())
 	pool := NewPool()
 	future, _ := pool.Submit(foo)
 	_, _ = future.Value()
@@ -30,6 +31,7 @@ func TestBasicPoolBatchSubmit(t *testing.T) {
 }
 
 func TestBasicPoolPause(t *testing.T) {
+	fmt.Println(t.Name())
 	pool := NewPool()
 	_, _ = pool.Submit(foo)
 	pool.Pause()
@@ -46,6 +48,7 @@ func TestBasicPoolPause(t *testing.T) {
 }
 
 func TestBasicPoolClose(t *testing.T) {
+	fmt.Println(t.Name())
 	pool := NewPool()
 	pool.Close()
 	_, err := pool.Submit(foo)
@@ -55,19 +58,17 @@ func TestBasicPoolClose(t *testing.T) {
 }
 
 func TestBasicPoolSetCapacity(t *testing.T) {
+	fmt.Println(t.Name())
 	pool := NewPool()
 	pool.SetCapacity(1)
-	fmt.Println(1)
 	if pool.Workers() != 1 {
 		t.Error("new number of workers should be 1")
 	}
 	pool.SetCapacity(10)
-	fmt.Println(10)
 	if pool.Workers() != 10 {
 		t.Error("new number of workers should be 10")
 	}
 	pool.SetCapacity(5)
-	fmt.Println(5)
 	if pool.Workers() != 5 {
 		t.Error("new number of workers should be 5")
 	}

@@ -1,6 +1,7 @@
 package pond
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -10,6 +11,7 @@ func fooPow(num interface{}) (i interface{}, err error) {
 }
 
 func TestFixedFuncPoolSubmit(t *testing.T) {
+	fmt.Println(t.Name())
 	pool := NewFixedFuncPool(fooPow)
 	future, _ := pool.Submit(2)
 	val, _ := future.Value()
@@ -20,6 +22,7 @@ func TestFixedFuncPoolSubmit(t *testing.T) {
 }
 
 func TestFixedFuncPoolSetNewFixedFunc(t *testing.T) {
+	fmt.Println(t.Name())
 	pool := NewFixedFuncPool(fooPow)
 	future, _ := pool.Submit(2)
 	val, _ := future.Value()
