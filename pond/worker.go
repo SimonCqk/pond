@@ -1,5 +1,7 @@
 package pond
 
+import "time"
+
 // Worker represents a executor broker for goroutine, do the real job
 // and obtained by Pool.
 type Worker interface {
@@ -19,31 +21,30 @@ type Worker interface {
 type pondWorker struct {
 	// taskQ is a replication of Pool.taskQ, pool will dispatch task to
 	// idle workers, otherwise worker will be asleep.
-	taskQ chan chan *taskWrapper
-	selfQ chan *taskWrapper
+	taskQ *ResizableChan
 	close chan struct{}
 	idle  bool
 }
 
-func newPondWorker(tq chan chan *taskWrapper) Worker {
+func newPondWorker(tq *ResizableChan) Worker {
 	pw := &pondWorker{
 		taskQ: tq,
-		selfQ: make(chan *taskWrapper),
 		close: make(chan struct{}, 1),
 		idle:  false,
 	}
-	tq <- pw.selfQ
 	go pw.run()
 	return pw
 }
 
 func (pw *pondWorker) run() {
+	timer := time.NewTimer(defaultWorkerIdleDuration)
+	defer timer.Stop()
 
 	for {
 		select {
 		case <-pw.close:
 			return
-		case task := <-pw.selfQ:
+		case task := <-pw.taskQ.Out():
 			pw.idle = false
 
 			taskRes := resultPool.Get().(*taskResult)
@@ -55,11 +56,11 @@ func (pw *pondWorker) run() {
 			case <-pw.close:
 				return
 			default:
-				// resend self queue into pool's task queue for dispatching.
-				pw.taskQ <- pw.selfQ
+				timer.Reset(defaultWorkerIdleDuration)
 			}
-
+		case <-timer.C:
 			pw.idle = true
+			timer.Reset(defaultWorkerIdleDuration)
 		}
 	}
 }

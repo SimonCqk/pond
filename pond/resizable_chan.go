@@ -39,8 +39,12 @@ func (ch *ResizableChan) Resize(size int) {
 	ch.resizeCh <- size
 }
 
-func (ch *ResizableChan) Len() int {
+func (ch *ResizableChan) Size() int {
 	return ch.size
+}
+
+func (ch *ResizableChan) Len() int {
+	return ch.buffer.Size()
 }
 
 func (ch *ResizableChan) Close() {

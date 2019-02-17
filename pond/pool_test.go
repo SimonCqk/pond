@@ -12,6 +12,7 @@ func foo() (interface{}, error) {
 }
 
 func TestBasicPoolSubmit(t *testing.T) {
+	fmt.Println(t.Name())
 	pool := NewPool()
 	future, _ := pool.Submit(foo)
 	_, _ = future.Value()

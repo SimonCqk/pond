@@ -1,7 +1,6 @@
 package pond
 
 import (
-	"fmt"
 	"testing"
 	"time"
 )
@@ -19,7 +18,7 @@ func TestResizableChan(t *testing.T) {
 		}
 	}()
 	time.Sleep(100 * time.Millisecond)
-	if ch.Len() != 3 {
+	if ch.Size() != 3 {
 		t.Error("len of ch should be 3")
 	}
 	ch.Resize(4)
@@ -31,7 +30,7 @@ func TestResizableChan(t *testing.T) {
 		}
 	}()
 	time.Sleep(100 * time.Millisecond)
-	if ch.Len() != 4 {
+	if ch.Size() != 4 {
 		t.Error("len of ch should be 4")
 	}
 	// pop 2 elements
@@ -46,8 +45,7 @@ func TestResizableChan(t *testing.T) {
 		default:
 		}
 	}()
-	fmt.Println(ch.Len())
-	if ch.Len() != 2 {
+	if ch.Size() != 2 {
 		t.Error("len of ch should be 2")
 	}
 	ch.Close()

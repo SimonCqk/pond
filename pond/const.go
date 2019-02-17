@@ -16,10 +16,16 @@ const (
 	// purge idle workers to recycle resource every defaultPurgeWorkersDuration seconds.
 	defaultPurgeWorkersDuration = 32 * time.Second
 
+	// worker will be set to idle after defaultWorkerIdleDuration.
+	defaultWorkerIdleDuration = defaultPurgeWorkersDuration / 2
+
 	// default pool capacity is defaultPoolCapacityFactor * NumCPU
 	defaultPoolCapacityFactor = 4
 
+	// default task queue capacity.
+	defaultTaskQueueCapacity = 1024
+
 	// pool auto expand its capacity when its len(tasksQueue) / cap(taskQueue) equals or
-	// greater than autoExpandFactor
-	autoExpandFactor = 0.75
+	// greater than autoScaleFactor
+	autoScaleFactor = 0.75
 )

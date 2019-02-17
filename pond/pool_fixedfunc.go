@@ -10,9 +10,8 @@ import (
 // arguments, do execution and pass the result. See it as a
 // executor.
 type FixedFuncPool struct {
-	pool  *basicPool
-	empty chan struct{}
-	f     FixedFunc
+	pool *basicPool
+	f    FixedFunc
 }
 
 type FixedFunc func(interface{}) (interface{}, error)
@@ -21,22 +20,20 @@ func NewFixedFuncPool(f FixedFunc, cap ...int) *FixedFuncPool {
 	cores := runtime.NumCPU()
 	bp := &basicPool{
 		capacity:      append(cap, defaultPoolCapacityFactor*cores)[0],
+		taskQ:         NewResizableChan(defaultTaskQueueCapacity),
 		pause:         make(chan struct{}, 1), // make pause buffered
 		close:         make(chan struct{}),
 		purgeDuration: defaultPurgeWorkersDuration,
 		purgeTicker:   time.NewTicker(defaultPurgeWorkersDuration),
 	}
 
-	bp.taskQ = make(chan chan *taskWrapper, bp.capacity)
-
 	for i := 0; i < bp.capacity; i++ {
 		bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
 	}
 	go bp.purgeWorkers()
 	return &FixedFuncPool{
-		pool:  bp,
-		empty: make(chan struct{}),
-		f:     f,
+		pool: bp,
+		f:    f,
 	}
 }
 
@@ -57,8 +54,7 @@ func (p *FixedFuncPool) Submit(arg interface{}) (Future, error) {
 		return nil, ErrPoolPaused
 	}
 
-	taskC := <-p.pool.taskQ
-	taskC <- &taskWrapper{
+	p.pool.taskQ.In() <- &taskWrapper{
 		t:       func() (interface{}, error) { return p.f(arg) },
 		resChan: rc,
 	}
@@ -93,8 +89,7 @@ func (p *FixedFuncPool) SubmitWithTimeout(arg interface{}, timeout time.Duration
 	select {
 	case <-time.After(timeout):
 		return nil, ErrTaskTimeout
-	case taskC := <-p.pool.taskQ:
-		taskC <- task
+	case p.pool.taskQ.In() <- task:
 	}
 
 	p.pool.scale()
@@ -106,11 +101,16 @@ func (p *FixedFuncPool) SetCapacity(newCap int) {
 	p.pool.SetCapacity(newCap)
 }
 
+func (p *FixedFuncPool) SetTaskCapacity(newCap int) {
+	p.pool.SetTaskCapacity(newCap)
+}
+
 // SetNewFixedFunc dynamically set new fixed function hold inside
 // pool, it will paused util old tasks done.
 func (p *FixedFuncPool) SetNewFixedFunc(newFunc FixedFunc) {
 	// pause the service, equivalent to a LOCK.
 	p.Pause()
+	empty := make(chan struct{})
 
 	emptyChecker := func(ctx context.Context) {
 		for {
@@ -118,13 +118,12 @@ func (p *FixedFuncPool) SetNewFixedFunc(newFunc FixedFunc) {
 			case <-ctx.Done():
 				return
 			default:
-				curLen := len(p.pool.taskQ)
-				// when curLen == capacity, all workers are in idle state and waiting for
-				// being dispatched.
+				curLen := p.pool.taskQ.Len()
 				if curLen == p.pool.capacity {
-					p.empty <- struct{}{}
+					empty <- struct{}{}
 					return
 				}
+				// control the checking-frequency
 				time.Sleep(time.Millisecond * time.Duration(curLen))
 			}
 		}
@@ -132,7 +131,7 @@ func (p *FixedFuncPool) SetNewFixedFunc(newFunc FixedFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go emptyChecker(ctx)
 	// wait for old tasks done
-	<-p.empty
+	<-empty
 	cancel()
 	// set new function
 	p.f = newFunc
