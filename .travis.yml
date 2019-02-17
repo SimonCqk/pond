@@ -1,6 +1,9 @@
 language: golang
 sudo: false
 
+before_script:
+  - go mod download
+
 script:
   - cd pond && go test -v
 
