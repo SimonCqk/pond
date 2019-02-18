@@ -2,7 +2,7 @@ language: golang
 sudo: false
 
 before_script:
-  - go get -v -t
+  - go get -t ./...
 
 script:
   - cd pond && go test -v
