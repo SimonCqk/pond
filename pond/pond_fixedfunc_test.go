@@ -12,7 +12,7 @@ func fooPow(num interface{}) (i interface{}, err error) {
 
 func TestFixedFuncPoolSubmit(t *testing.T) {
 	fmt.Println(t.Name())
-	pool := NewFixedFuncPool(fooPow)
+	pool := newFixedFuncPool(fooPow)
 	future, _ := pool.Submit(2)
 	val, _ := future.Value()
 	if val = val.(int); val != 4 {
@@ -23,7 +23,7 @@ func TestFixedFuncPoolSubmit(t *testing.T) {
 
 func TestFixedFuncPoolSetNewFixedFunc(t *testing.T) {
 	fmt.Println(t.Name())
-	pool := NewFixedFuncPool(fooPow)
+	pool := newFixedFuncPool(fooPow)
 	future, _ := pool.Submit(2)
 	val, _ := future.Value()
 	if val = val.(int); val != 4 {

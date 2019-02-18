@@ -2,15 +2,17 @@ package pond
 
 import "github.com/Simoncqk/go-containers"
 
-type ResizableChan struct {
+// TaskQueue is a thead-safe queue implementation based on
+// two chan: in and out.
+type TaskQueue struct {
 	in, out  chan *taskWrapper
 	resizeCh chan int
 	buffer   *containers.Queue
 	size     int
 }
 
-func NewResizableChan(initSize int) *ResizableChan {
-	ch := &ResizableChan{
+func NewTaskQueue(initSize int) *TaskQueue {
+	ch := &TaskQueue{
 		in:       make(chan *taskWrapper),
 		out:      make(chan *taskWrapper),
 		resizeCh: make(chan int),
@@ -21,37 +23,37 @@ func NewResizableChan(initSize int) *ResizableChan {
 	return ch
 }
 
-func (ch *ResizableChan) In() chan<- *taskWrapper {
+func (ch *TaskQueue) In() chan<- *taskWrapper {
 	return ch.in
 }
 
-func (ch *ResizableChan) Out() <-chan *taskWrapper {
+func (ch *TaskQueue) Out() <-chan *taskWrapper {
 	return ch.out
 }
 
-func (ch *ResizableChan) Resize(size int) {
+func (ch *TaskQueue) Resize(size int) {
 	if size == ch.size {
 		return
 	}
 	if size <= 0 {
-		panic("invalid size of ResizableChan")
+		panic("invalid size of TaskQueue")
 	}
 	ch.resizeCh <- size
 }
 
-func (ch *ResizableChan) Size() int {
+func (ch *TaskQueue) Size() int {
 	return ch.size
 }
 
-func (ch *ResizableChan) Len() int {
+func (ch *TaskQueue) Len() int {
 	return ch.buffer.Size()
 }
 
-func (ch *ResizableChan) Close() {
+func (ch *TaskQueue) Close() {
 	close(ch.in)
 }
 
-func (ch *ResizableChan) autoResize() {
+func (ch *TaskQueue) autoResize() {
 
 	var (
 		input, output chan *taskWrapper

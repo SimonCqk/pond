@@ -48,7 +48,7 @@ type Pool interface {
 type basicPool struct {
 	capacity      int
 	workers       []Worker
-	taskQ         *ResizableChan
+	taskQ         *TaskQueue
 	pause         chan struct{}
 	close         chan struct{}
 	mu            sync.RWMutex
@@ -60,7 +60,7 @@ func newBasicPool(cap ...int) *basicPool {
 	cores := runtime.NumCPU()
 	bp := &basicPool{
 		capacity:      append(cap, defaultPoolCapacityFactor*cores)[0],
-		taskQ:         NewResizableChan(defaultTaskQueueCapacity),
+		taskQ:         NewTaskQueue(defaultTaskQueueCapacity),
 		pause:         make(chan struct{}, 1), // make pause buffered
 		close:         make(chan struct{}),
 		purgeDuration: defaultPurgeWorkersDuration,

@@ -16,11 +16,11 @@ type FixedFuncPool struct {
 
 type FixedFunc func(interface{}) (interface{}, error)
 
-func NewFixedFuncPool(f FixedFunc, cap ...int) *FixedFuncPool {
+func newFixedFuncPool(f FixedFunc, cap ...int) *FixedFuncPool {
 	cores := runtime.NumCPU()
 	bp := &basicPool{
 		capacity:      append(cap, defaultPoolCapacityFactor*cores)[0],
-		taskQ:         NewResizableChan(defaultTaskQueueCapacity),
+		taskQ:         NewTaskQueue(defaultTaskQueueCapacity),
 		pause:         make(chan struct{}, 1), // make pause buffered
 		close:         make(chan struct{}),
 		purgeDuration: defaultPurgeWorkersDuration,

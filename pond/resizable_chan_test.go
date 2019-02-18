@@ -6,7 +6,7 @@ import (
 )
 
 func TestResizableChan(t *testing.T) {
-	ch := NewResizableChan(3)
+	ch := NewTaskQueue(3)
 	for i := 0; i < 3; i++ {
 		ch.In() <- &taskWrapper{}
 	}
