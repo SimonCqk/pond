@@ -5,6 +5,9 @@ import "time"
 // Worker represents a executor broker for goroutine, do the real job
 // and obtained by Pool.
 type Worker interface {
+	// Init do some initial working before worker launch.
+	Init()
+
 	// run start worker service listening for task coming, it should be
 	// invoked instantly when worker created.
 	run()
@@ -19,14 +22,20 @@ type Worker interface {
 }
 
 type pondWorker struct {
-	// taskQ is a replication of Pool.taskQ, pool will dispatch task to
-	// idle workers, otherwise worker will be asleep.
-	taskQ *ResizableChan
+	// taskQ is a replication of Pool.taskQ, workers preempt tasks over
+	// task queue, and it is the main communicate entry for workers and
+	// the pool.
+	taskQ *TaskQueue
 	close chan struct{}
 	idle  bool
 }
 
-func newPondWorker(tq *ResizableChan) Worker {
+// WorkCtor is a worker constructor and return a new worker instance,
+// Workers preempt tasks over task queue, and it is the main communicate
+// entry for workers and the pool.
+type WorkerCtor func(tq *TaskQueue) Worker
+
+func newPondWorker(tq *TaskQueue) Worker {
 	pw := &pondWorker{
 		taskQ: tq,
 		close: make(chan struct{}, 1),
@@ -35,6 +44,8 @@ func newPondWorker(tq *ResizableChan) Worker {
 	go pw.run()
 	return pw
 }
+
+func (pw *pondWorker) Init() {}
 
 func (pw *pondWorker) run() {
 	timer := time.NewTimer(defaultWorkerIdleDuration)

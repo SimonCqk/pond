@@ -8,7 +8,7 @@ type FixedSizePool struct {
 	*basicPool
 }
 
-func newFixedSizePool(cap, maxTasks int) *FixedSizePool {
+func newFixedSizePool(cap, maxTasks int, wc WorkerCtor) *FixedSizePool {
 	bp := &basicPool{
 		capacity:      cap,
 		taskQ:         NewTaskQueue(maxTasks),
@@ -17,8 +17,14 @@ func newFixedSizePool(cap, maxTasks int) *FixedSizePool {
 		purgeDuration: defaultPurgeWorkersDuration,
 		purgeTicker:   time.NewTicker(defaultPurgeWorkersDuration),
 	}
-	for i := 0; i < bp.capacity; i++ {
-		bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
+	if wc == nil {
+		for i := 0; i < bp.capacity; i++ {
+			bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
+		}
+	} else {
+		for i := 0; i < bp.capacity; i++ {
+			bp.workers = append(bp.workers, wc(bp.taskQ))
+		}
 	}
 	go bp.purgeWorkers()
 	return &FixedSizePool{bp}

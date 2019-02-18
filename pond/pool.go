@@ -31,6 +31,9 @@ type Pool interface {
 	// SetTaskCapacity dynamically reset the capacity of task queue.
 	SetTaskCapacity(newCap int)
 
+	// Workers return current number of workers pool hold.
+	Workers() int
+
 	// Pause will block the whole pool, util Resume is invoked.
 	// Pool should wait for all under running tasks to be done, and
 	// clear all idle workers.
@@ -56,7 +59,7 @@ type basicPool struct {
 	purgeTicker   *time.Ticker
 }
 
-func newBasicPool(cap ...int) *basicPool {
+func newBasicPool(wc WorkerCtor, cap ...int) *basicPool {
 	cores := runtime.NumCPU()
 	bp := &basicPool{
 		capacity:      append(cap, defaultPoolCapacityFactor*cores)[0],
@@ -66,9 +69,14 @@ func newBasicPool(cap ...int) *basicPool {
 		purgeDuration: defaultPurgeWorkersDuration,
 		purgeTicker:   time.NewTicker(defaultPurgeWorkersDuration),
 	}
-
-	for i := 0; i < bp.capacity; i++ {
-		bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
+	if wc == nil {
+		for i := 0; i < bp.capacity; i++ {
+			bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
+		}
+	} else {
+		for i := 0; i < bp.capacity; i++ {
+			bp.workers = append(bp.workers, wc(bp.taskQ))
+		}
 	}
 	go bp.purgeWorkers()
 	return bp

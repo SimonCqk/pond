@@ -16,7 +16,7 @@ type FixedFuncPool struct {
 
 type FixedFunc func(interface{}) (interface{}, error)
 
-func newFixedFuncPool(f FixedFunc, cap ...int) *FixedFuncPool {
+func newFixedFuncPool(f FixedFunc, wc WorkerCtor, cap ...int) *FixedFuncPool {
 	cores := runtime.NumCPU()
 	bp := &basicPool{
 		capacity:      append(cap, defaultPoolCapacityFactor*cores)[0],
@@ -26,9 +26,14 @@ func newFixedFuncPool(f FixedFunc, cap ...int) *FixedFuncPool {
 		purgeDuration: defaultPurgeWorkersDuration,
 		purgeTicker:   time.NewTicker(defaultPurgeWorkersDuration),
 	}
-
-	for i := 0; i < bp.capacity; i++ {
-		bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
+	if wc == nil {
+		for i := 0; i < bp.capacity; i++ {
+			bp.workers = append(bp.workers, newPondWorker(bp.taskQ))
+		}
+	} else {
+		for i := 0; i < bp.capacity; i++ {
+			bp.workers = append(bp.workers, wc(bp.taskQ))
+		}
 	}
 	go bp.purgeWorkers()
 	return &FixedFuncPool{
