@@ -20,7 +20,7 @@ func newFixedFuncPool(f FixedFunc, wc WorkerCtor, cap ...int) *FixedFuncPool {
 	cores := runtime.NumCPU()
 	bp := &basicPool{
 		capacity:      append(cap, defaultPoolCapacityFactor*cores)[0],
-		taskQ:         NewTaskQueue(defaultTaskQueueCapacity),
+		taskQ:         make(chan *taskWrapper, defaultTaskQueueCapacity),
 		pause:         make(chan struct{}, 1), // make pause buffered
 		close:         make(chan struct{}),
 		purgeDuration: defaultPurgeWorkersDuration,
@@ -59,7 +59,7 @@ func (p *FixedFuncPool) Submit(arg interface{}) (Future, error) {
 		return nil, ErrPoolPaused
 	}
 
-	p.pool.taskQ.In() <- &taskWrapper{
+	p.pool.taskQ <- &taskWrapper{
 		t:       func() (interface{}, error) { return p.f(arg) },
 		resChan: rc,
 	}
@@ -94,7 +94,7 @@ func (p *FixedFuncPool) SubmitWithTimeout(arg interface{}, timeout time.Duration
 	select {
 	case <-time.After(timeout):
 		return nil, ErrTaskTimeout
-	case p.pool.taskQ.In() <- task:
+	case p.pool.taskQ <- task:
 	}
 
 	p.pool.scale()
@@ -104,10 +104,6 @@ func (p *FixedFuncPool) SubmitWithTimeout(arg interface{}, timeout time.Duration
 
 func (p *FixedFuncPool) SetCapacity(newCap int) {
 	p.pool.SetCapacity(newCap)
-}
-
-func (p *FixedFuncPool) SetTaskCapacity(newCap int) {
-	p.pool.SetTaskCapacity(newCap)
 }
 
 // SetNewFixedFunc dynamically set new fixed function hold inside
@@ -123,7 +119,7 @@ func (p *FixedFuncPool) SetNewFixedFunc(newFunc FixedFunc) {
 			case <-ctx.Done():
 				return
 			default:
-				curLen := p.pool.taskQ.Len()
+				curLen := len(p.pool.taskQ)
 				if curLen == 0 {
 					empty <- struct{}{}
 					return

@@ -1,6 +1,7 @@
 package pond
 
 import (
+	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -28,9 +29,6 @@ type Pool interface {
 	// SetCapacity dynamically reset the capacity(number of workers) of pool.
 	SetCapacity(newCap int)
 
-	// SetTaskCapacity dynamically reset the capacity of task queue.
-	SetTaskCapacity(newCap int)
-
 	// Workers return current number of workers pool hold.
 	Workers() int
 
@@ -51,7 +49,7 @@ type Pool interface {
 type basicPool struct {
 	capacity      int
 	workers       []Worker
-	taskQ         *TaskQueue
+	taskQ         chan *taskWrapper
 	pause         chan struct{}
 	close         chan struct{}
 	mu            sync.RWMutex
@@ -63,7 +61,7 @@ func newBasicPool(wc WorkerCtor, cap ...int) *basicPool {
 	cores := runtime.NumCPU()
 	bp := &basicPool{
 		capacity:      append(cap, defaultPoolCapacityFactor*cores)[0],
-		taskQ:         NewTaskQueue(defaultTaskQueueCapacity),
+		taskQ:         make(chan *taskWrapper, defaultTaskQueueCapacity),
 		pause:         make(chan struct{}, 1), // make pause buffered
 		close:         make(chan struct{}),
 		purgeDuration: defaultPurgeWorkersDuration,
@@ -133,7 +131,7 @@ func (bp *basicPool) Submit(task Task) (Future, error) {
 		return nil, ErrPoolPaused
 	}
 
-	bp.taskQ.In() <- &taskWrapper{t: task, resChan: rc}
+	bp.taskQ <- &taskWrapper{t: task, resChan: rc}
 
 	bp.scale()
 
@@ -160,7 +158,7 @@ func (bp *basicPool) SubmitWithTimeout(task Task, timeout time.Duration) (Future
 	select {
 	case <-time.After(timeout):
 		return nil, ErrTaskTimeout
-	case bp.taskQ.In() <- &taskWrapper{t: task, resChan: rc}:
+	case bp.taskQ <- &taskWrapper{t: task, resChan: rc}:
 	}
 
 	bp.scale()
@@ -173,6 +171,7 @@ func (bp *basicPool) SetCapacity(newCap int) {
 	defer bp.mu.Unlock()
 
 	curCap := len(bp.workers)
+	bp.capacity = newCap
 	if curCap == newCap {
 		return
 	}
@@ -191,13 +190,6 @@ func (bp *basicPool) SetCapacity(newCap int) {
 		}
 		bp.workers = bp.workers[:newCap]
 	}
-}
-
-func (bp *basicPool) SetTaskCapacity(newCap int) {
-	if newCap == bp.taskQ.Size() {
-		return
-	}
-	bp.taskQ.Resize(newCap)
 }
 
 func (bp *basicPool) Pause() {
@@ -234,7 +226,7 @@ func (bp *basicPool) Close() {
 	}
 	bp.workers = nil
 
-	bp.taskQ.Close()
+	close(bp.taskQ)
 	bp.purgeTicker.Stop()
 }
 
@@ -264,8 +256,9 @@ func (bp *basicPool) SetPurgeDuration(dur time.Duration) {
 
 // scale expand number of workers when too many tasks accumulated.
 func (bp *basicPool) scale() {
-	if float32(bp.taskQ.Size())*autoScaleFactor > float32(bp.taskQ.Len()) {
-		bp.SetCapacity(bp.capacity + bp.capacity/2)
+	fmt.Println("========> scaled")
+	if float32(cap(bp.taskQ))*autoScaleFactor < float32(len(bp.taskQ)) {
+		bp.SetCapacity(2 * bp.capacity)
 	}
 	// purgeWorkers() response for shrinking.
 }

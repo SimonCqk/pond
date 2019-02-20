@@ -20,7 +20,10 @@ const (
 	defaultWorkerIdleDuration = defaultPurgeWorkersDuration / 2
 
 	// default pool capacity is defaultPoolCapacityFactor * NumCPU
-	defaultPoolCapacityFactor = 4
+	defaultPoolCapacityFactor = 16
+
+	// default task queue size, each worker hold 128 buffered tasks.
+	defaultTaskQueueSize = defaultPoolCapacityFactor * 128
 
 	// default task queue capacity.
 	defaultTaskQueueCapacity = 1024

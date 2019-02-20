@@ -25,7 +25,7 @@ type pondWorker struct {
 	// taskQ is a replication of Pool.taskQ, workers preempt tasks over
 	// task queue, and it is the main communicate entry for workers and
 	// the pool.
-	taskQ *TaskQueue
+	taskQ chan *taskWrapper
 	close chan struct{}
 	idle  bool
 }
@@ -33,9 +33,9 @@ type pondWorker struct {
 // WorkCtor is a worker constructor and return a new worker instance,
 // Workers preempt tasks over task queue, and it is the main communicate
 // entry for workers and the pool.
-type WorkerCtor func(tq *TaskQueue) Worker
+type WorkerCtor func(tq chan *taskWrapper) Worker
 
-func newPondWorker(tq *TaskQueue) Worker {
+func newPondWorker(tq chan *taskWrapper) Worker {
 	pw := &pondWorker{
 		taskQ: tq,
 		close: make(chan struct{}, 1),
@@ -55,7 +55,10 @@ func (pw *pondWorker) run() {
 		select {
 		case <-pw.close:
 			return
-		case task := <-pw.taskQ.Out():
+		case task := <-pw.taskQ:
+			if task == nil {
+				continue
+			}
 			pw.idle = false
 
 			taskRes := resultPool.Get().(*taskResult)
