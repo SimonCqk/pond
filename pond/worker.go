@@ -1,6 +1,8 @@
 package pond
 
-import "time"
+import (
+	"time"
+)
 
 // Worker represents a executor broker for goroutine, do the real job
 // and obtained by Pool.
@@ -61,9 +63,8 @@ func (pw *pondWorker) run() {
 			}
 			pw.idle = false
 
-			taskRes := resultPool.Get().(*taskResult)
-			taskRes.val, taskRes.err = task.t()
-			task.resChan <- taskRes
+			task.resChan <- rscPool.GetTaskResult(task.t())
+			rscPool.PutTask(task)
 
 			// check closing
 			select {

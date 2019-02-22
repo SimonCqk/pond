@@ -1,21 +1,10 @@
 package pond
 
 import (
-	"fmt"
 	"runtime"
 	"sync"
 	"time"
 )
-
-func init() {
-	resultPool = &sync.Pool{
-		New: func() interface{} {
-			return &taskResult{}
-		},
-	}
-}
-
-var resultPool *sync.Pool
 
 // Pool interface defines the critical methods a pool must implement,
 // it also represents the main methods exposed to users.
@@ -131,10 +120,8 @@ func (bp *basicPool) Submit(task Task) (Future, error) {
 		return nil, ErrPoolPaused
 	}
 
-	bp.taskQ <- &taskWrapper{t: task, resChan: rc}
-
+	bp.taskQ <- rscPool.GetTask(task, rc)
 	bp.scale()
-
 	return newPondFuture(rc), nil
 }
 
@@ -158,7 +145,7 @@ func (bp *basicPool) SubmitWithTimeout(task Task, timeout time.Duration) (Future
 	select {
 	case <-time.After(timeout):
 		return nil, ErrTaskTimeout
-	case bp.taskQ <- &taskWrapper{t: task, resChan: rc}:
+	case bp.taskQ <- rscPool.GetTask(task, rc):
 	}
 
 	bp.scale()
@@ -256,7 +243,6 @@ func (bp *basicPool) SetPurgeDuration(dur time.Duration) {
 
 // scale expand number of workers when too many tasks accumulated.
 func (bp *basicPool) scale() {
-	fmt.Println("========> scaled")
 	if float32(cap(bp.taskQ))*autoScaleFactor < float32(len(bp.taskQ)) {
 		bp.SetCapacity(2 * bp.capacity)
 	}

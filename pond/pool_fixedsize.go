@@ -33,7 +33,3 @@ func newFixedSizePool(cap, maxTasks int, wc WorkerCtor) *FixedSizePool {
 // SetCapacity do nothing, for overriding the SetCapacity impl of
 // basicPool.
 func (p *FixedSizePool) SetCapacity(newCap int) {}
-
-// SetTaskCapacity do nothing, for overriding the SetTaskCapacity
-// impl of basicPool.
-func (p *FixedSizePool) SetTaskCapacity(newCap int) {}

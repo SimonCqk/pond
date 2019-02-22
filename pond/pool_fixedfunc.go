@@ -59,11 +59,7 @@ func (p *FixedFuncPool) Submit(arg interface{}) (Future, error) {
 		return nil, ErrPoolPaused
 	}
 
-	p.pool.taskQ <- &taskWrapper{
-		t:       func() (interface{}, error) { return p.f(arg) },
-		resChan: rc,
-	}
-
+	p.pool.taskQ <- rscPool.GetTask(func() (interface{}, error) { return p.f(arg) }, rc)
 	p.pool.scale()
 
 	return newPondFuture(rc), nil
@@ -86,15 +82,10 @@ func (p *FixedFuncPool) SubmitWithTimeout(arg interface{}, timeout time.Duration
 		return nil, ErrPoolPaused
 	}
 
-	task := &taskWrapper{
-		t:       func() (interface{}, error) { return p.f(arg) },
-		resChan: rc,
-	}
-
 	select {
 	case <-time.After(timeout):
 		return nil, ErrTaskTimeout
-	case p.pool.taskQ <- task:
+	case p.pool.taskQ <- rscPool.GetTask(func() (interface{}, error) { return p.f(arg) }, rc):
 	}
 
 	p.pool.scale()

@@ -66,7 +66,7 @@ func (pf *pondFuture) Value() (interface{}, error) {
 	}
 
 	pf.value, pf.err = taskRes.val, taskRes.err
-	resultPool.Put(taskRes)
+	rscPool.PutTaskResult(taskRes)
 
 	atomic.StoreInt32(&pf.ready, 1)
 	close(pf.done)
@@ -80,14 +80,11 @@ func (pf *pondFuture) Then(next func(interface{}) (interface{}, error)) Future {
 	go func() {
 		val, err := pf.Value()
 		if err != nil {
-			tr := resultPool.Get().(*taskResult)
-			tr.err = err
+			tr := rscPool.GetTaskResult(nil, err)
 			doneC <- tr
 			return
 		}
-		tr := resultPool.Get().(*taskResult)
-		tr.val, tr.err = next(val)
-		doneC <- tr
+		doneC <- rscPool.GetTaskResult(next(val))
 	}()
 	return f
 }
